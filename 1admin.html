@@ -1,0 +1,2234 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ইনভেন্টরি ও কর্মী খাতা - ড্যাশবোর্ড</title>
+    
+    <!-- Firebase SDKs (v8) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <!-- jsPDF + autoTable -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <script>
+      // content:// বা file:// থেকে খুললে localStorage/Firebase সতর্কতা
+      window.__APP_ORIGIN_OK = (location.protocol === 'https:' || location.protocol === 'http:' || location.hostname === 'localhost');
+    </script>
+
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: #f0f2f5; margin: 0; padding: 15px; }
+        .container { max-width: 1100px; margin: 0 auto; }
+        h1 { color: #1a73e8; text-align: center; margin-top: 10px; margin-bottom: 20px; }
+        h2, h3 { color: #1a73e8; margin-top: 0; }
+        .card { background: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        
+        /* ইউজার বার স্টাইল */
+        .user-bar { background: #1a73e8; color: white; padding: 12px 20px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+        .bar-left { display: flex; align-items: center; gap: 12px; }
+        .btn-back { background: rgba(255, 255, 255, 0.2); color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold; transition: 0.2s; }
+        .btn-back:hover { background: rgba(255, 255, 255, 0.35); }
+        .user-info { font-size: 16px; font-weight: bold; }
+        .user-badge { background: #ffffff; color: #1a73e8; padding: 3px 8px; border-radius: 4px; font-size: 13px; margin-left: 5px; }
+        
+        /* ড্যাশবোর্ড বক্স */
+        .dashboard-header {
+            background: #ffffff;
+            border-left: 5px solid #1a73e8;
+            padding: 12px 20px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .dashboard-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* পাশাপাশি অ্যাপ আইকন রো (Row Layout) */
+        .app-icon-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            justify-content: flex-start;
+            align-items: center;
+        }
+
+        .app-icon-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 72px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            padding: 5px;
+            border-radius: 8px;
+            transition: transform 0.2s;
+        }
+
+        .app-icon-btn:hover {
+            transform: scale(1.08);
+        }
+
+        /* ছোট বৃত্তাকার আইকন বক্স */
+        .app-icon-btn .icon-circle {
+            width: 46px;
+            height: 46px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            color: white;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.15);
+            margin-bottom: 4px;
+        }
+
+        .app-icon-btn span.label {
+            font-size: 11px;
+            font-weight: 600;
+            color: #333;
+            text-align: center;
+            line-height: 1.2;
+            word-break: break-word;
+        }
+
+        /* সক্রিয় (Active) আইকন ইফেক্ট */
+        .app-icon-btn.active .icon-circle {
+            outline: 3px solid #1a73e8;
+            outline-offset: 2px;
+        }
+
+        /* আইকন কালার কোড */
+        .bg-add-worker { background: linear-gradient(135deg, #6c757d, #495057); }
+        .bg-manage-worker { background: linear-gradient(135deg, #6f42c1, #563d7c); }
+        .bg-add-item { background: linear-gradient(135deg, #495057, #343a40); }
+        .bg-manage-item { background: linear-gradient(135deg, #17a2b8, #117a8b); }
+        .bg-add-user { background: linear-gradient(135deg, #28a745, #1e7e34); }
+        .bg-data-entry { background: linear-gradient(135deg, #1a73e8, #1557b0); }
+        .bg-view-report { background: linear-gradient(135deg, #ff9800, #e68a00); }
+
+        .form-group { margin-bottom: 15px; }
+        .form-row { display: flex; gap: 15px; flex-wrap: wrap; }
+        .form-row .form-group { flex: 1; min-width: 180px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; color: #333; }
+        input, select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+        .btn { background-color: #1a73e8; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 16px; width: 100%; }
+        .btn:hover { background-color: #1557b0; }
+        .btn-secondary { background-color: #6c757d; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-size: 14px; margin-bottom: 5px; }
+        .btn-secondary:hover { background-color: #5a6268; }
+        .btn-settings { background-color: #ff9800; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; margin-right: 5px; }
+        .btn-settings:hover { background-color: #e68a00; }
+        .btn-logout { background-color: #dc3545; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; }
+        .btn-logout:hover { background-color: #bd2130; }
+        .btn-print { background-color: #28a745; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-size: 14px; margin-left: 5px; }
+        .btn-print:hover { background-color: #218838; }
+        .btn-edit { background-color: #f39c12; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; margin-right: 5px; }
+        .btn-delete { background-color: #e74c3c; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        table, th, td { border: 1px solid #ddd; }
+        th, td { padding: 10px; text-align: center; font-size: 14px; }
+        th { background-color: #1a73e8; color: white; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        .note { font-size: 12px; color: #666; margin-top: 4px; }
+        .header-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px; }
+        .rate-type-container { display: flex; gap: 15px; margin-top: 5px; }
+        .rate-type-container label { font-weight: normal; cursor: pointer; display: flex; align-items: center; gap: 5px; }
+        .login-box { max-width: 400px; margin: 50px auto; background: white; padding: 25px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.15); }
+        .pin-box { background: #fff3cd; border: 1px solid #ffeeba; padding: 12px; border-radius: 6px; margin-bottom: 15px; }
+        .settings-card { background: #e8f0fe; border: 1px solid #d2e3fc; }
+        .item-list-box { background: #f8f9fa; border: 1px solid #dee2e6; padding: 12px; border-radius: 6px; margin-top: 10px; }
+        .item-tag { display: inline-flex; align-items: center; background: #ffffff; border: 1px solid #d1d5db; padding: 6px 12px; border-radius: 20px; margin: 4px; font-size: 13px; }
+        .item-tag span { margin-right: 8px; font-weight: 500; }
+        .item-btn { background: none; border: none; cursor: pointer; padding: 0 4px; font-size: 13px; }
+        .forgot-link { display: block; text-align: center; margin-top: 15px; color: #1a73e8; text-decoration: none; font-size: 14px; font-weight: 500; }
+        
+        .badge-work { background-color: #0d6efd; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; }
+        .badge-advance { background-color: #fd7e14; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; }
+        .badge-paid { background-color: #198754; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; }
+
+        .summary-card { background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 15px; margin-bottom: 15px; }
+        .summary-grid { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+        .summary-item { text-align: center; flex: 1; min-width: 120px; padding: 10px; background: white; border-radius: 6px; border: 1px solid #dee2e6; }
+        .summary-item h4 { margin: 0 0 5px 0; font-size: 13px; color: #6c757d; }
+        .summary-item .val { font-size: 18px; font-weight: bold; }
+
+        /* ডিফল্ট ভাবে সব প্যানেল লুকিয়ে রাখার ক্লাস */
+        .feature-panel { display: none; }
+
+        @media print {
+            body { background-color: #ffffff; padding: 0; }
+            .no-print, .user-bar, button, form, .btn-secondary, .btn-print, .settings-card, .item-list-box { display: none !important; }
+            .card { box-shadow: none; border: none; padding: 0; }
+            th { background-color: #000 !important; color: #fff !important; }
+        }
+
+        /* ===== Professional App Redesign ===== */
+        :root{
+            --primary:#2563eb; --primary-dark:#1d4ed8; --sidebar:#0f172a;
+            --bg:#f1f5f9; --surface:#ffffff; --text:#0f172a; --muted:#64748b;
+            --border:#e2e8f0; --radius:16px;
+        }
+        *{font-family:"Segoe UI","Noto Sans Bengali",Tahoma,sans-serif;}
+        body{background:var(--bg);padding:0;color:var(--text);}
+        .container{max-width:1440px;min-height:100vh;margin:0 auto;padding:0 18px 28px;}
+        h1{color:var(--text);text-align:left;font-size:26px;margin:24px 0 18px;}
+        .user-bar{background:linear-gradient(135deg,#0f172a,#1e293b);border-radius:0 0 18px 18px;padding:16px 22px;margin:0 -18px 18px;box-shadow:0 8px 24px rgba(15,23,42,.18);}
+        .btn-back{border-radius:10px;padding:8px 14px}
+        .user-badge{border-radius:999px;padding:4px 10px;font-size:11px;font-weight:700}
+        .card,.dashboard-header,.summary-card{border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 6px 20px rgba(15,23,42,.05);}
+        .card{padding:22px;background:var(--surface)}
+        .dashboard-header{border-left:none;background:linear-gradient(135deg,#eff6ff,#fff);padding:16px 18px;margin-bottom:18px;}
+        .dashboard-title{font-size:20px;color:var(--text)}
+        .app-icon-row{gap:10px;padding:6px 0;}
+        .app-icon-btn{width:108px;padding:10px 6px;border:1px solid transparent;border-radius:14px;}
+        .app-icon-btn:hover{transform:translateY(-3px);background:#f8fafc;border-color:var(--border)}
+        .app-icon-btn .icon-circle{width:52px;height:52px;border-radius:15px;font-size:23px;margin-bottom:7px}
+        .app-icon-btn span.label{font-size:12px;color:#334155}
+        .app-icon-btn.active{background:#eff6ff;border-color:#bfdbfe}
+        .app-icon-btn.active .icon-circle{outline:none;box-shadow:0 0 0 3px #bfdbfe,0 8px 16px rgba(37,99,235,.18)}
+        .feature-panel{animation:fadeUp .22s ease}
+        @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .form-row{gap:18px}
+        input,select{border:1px solid #cbd5e1;border-radius:10px;padding:11px 12px;background:#fff;transition:.2s}
+        input:focus,select:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+        label{font-size:13px;color:#334155}
+        .btn{background:linear-gradient(135deg,var(--primary),var(--primary-dark));border-radius:10px;padding:12px 20px;font-weight:700;box-shadow:0 6px 14px rgba(37,99,235,.18)}
+        .btn-secondary,.btn-settings,.btn-logout,.btn-print,.btn-edit,.btn-delete{border-radius:9px}
+        .settings-card{background:linear-gradient(135deg,#eff6ff,#fff);border-color:#bfdbfe}
+        .pin-box{border-radius:12px;border-color:#fde68a;background:#fffbeb}
+        .summary-card{background:#f8fafc;padding:16px;margin:8px 0 18px}
+        .summary-grid{gap:14px}
+        .summary-item{border:1px solid var(--border);border-radius:14px;padding:16px;box-shadow:0 2px 7px rgba(15,23,42,.03)}
+        .summary-item h4{font-size:12px;text-transform:uppercase;letter-spacing:.3px}
+        .summary-item .val{font-size:21px;color:var(--text)}
+        .header-flex{padding-bottom:10px;border-bottom:1px solid var(--border)}
+        .item-list-box{border-radius:14px;padding:16px}
+        .item-tag{border-radius:10px;padding:9px 12px;margin:5px 3px;background:#fff;box-shadow:0 2px 6px rgba(15,23,42,.04)}
+        table{border-collapse:separate;border-spacing:0;border:1px solid var(--border);border-radius:14px;overflow:hidden;background:#fff}
+        table,th,td{border:none}
+        th{background:#0f172a;padding:13px 10px;font-size:12px;text-transform:uppercase;letter-spacing:.2px}
+        td{border-top:1px solid var(--border);padding:12px 10px;color:#334155}
+        tr:nth-child(even){background:#f8fafc}
+        tr:hover{background:#eff6ff}
+        .badge-work,.badge-advance,.badge-paid{border-radius:999px;padding:4px 8px;font-weight:700}
+        @media(max-width:700px){
+            .container{padding:0 10px 20px}
+            .user-bar{margin:0 -10px 14px;border-radius:0 0 14px 14px;padding:12px}
+            .user-info{font-size:13px}.app-icon-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+            .app-icon-btn{width:100%;min-width:0}.app-icon-btn .icon-circle{width:46px;height:46px;font-size:20px}
+            .card{padding:14px;border-radius:14px}h1{font-size:21px;margin:18px 0 14px}
+            .summary-grid{display:grid;grid-template-columns:repeat(2,1fr)}.summary-item{min-width:0;padding:12px}
+            table{display:block;overflow-x:auto;white-space:nowrap}
+        }
+
+        /* ===== Biometric Modal ===== */
+        .bio-modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(15,23,42,0.55);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+        }
+        .bio-modal-overlay.open { display: flex; }
+        .bio-modal {
+            background: #fff;
+            border-radius: 20px;
+            padding: 28px 28px 22px;
+            max-width: 420px;
+            width: 92%;
+            box-shadow: 0 20px 60px rgba(15,23,42,.22);
+            animation: fadeUp .2s ease;
+        }
+        .bio-modal h3 { margin: 0 0 6px; color: #0f172a; font-size: 19px; }
+        .bio-modal .bio-sub { color: #64748b; font-size: 13px; margin-bottom: 18px; }
+        .bio-modal .form-group { margin-bottom: 14px; }
+        .bio-modal label { font-size: 13px; color: #334155; font-weight: 600; margin-bottom: 5px; display: block; }
+        .bio-modal input { width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 10px; font-size: 14px; box-sizing: border-box; }
+        .bio-modal input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+
+        .bio-fingerprint-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border: 2px dashed #cbd5e1;
+            border-radius: 16px;
+            padding: 22px 16px;
+            margin: 14px 0;
+            cursor: pointer;
+            transition: .2s;
+            background: #f8fafc;
+        }
+        .bio-fingerprint-box:hover { border-color: #2563eb; background: #eff6ff; }
+        .bio-fingerprint-box.scanning { border-color: #f59e0b; background: #fffbeb; animation: pulse 1.2s infinite; }
+        .bio-fingerprint-box.success { border-color: #22c55e; background: #f0fdf4; }
+        .bio-fingerprint-box.error { border-color: #ef4444; background: #fef2f2; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.65} }
+
+        .bio-fp-icon { font-size: 52px; margin-bottom: 10px; line-height: 1; }
+        .bio-fp-label { font-size: 13px; font-weight: 600; color: #475569; text-align: center; }
+        .bio-fp-status { font-size: 12px; color: #64748b; margin-top: 4px; text-align: center; min-height: 18px; }
+
+        .bio-modal-actions { display: flex; gap: 10px; margin-top: 18px; }
+        .bio-btn-primary { flex: 1; background: linear-gradient(135deg,#2563eb,#1d4ed8); color: #fff; border: none; padding: 11px; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; }
+        .bio-btn-primary:hover { background: #1d4ed8; }
+        .bio-btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+        .bio-btn-secondary { background: #f1f5f9; color: #475569; border: none; padding: 11px 18px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; }
+        .bio-btn-secondary:hover { background: #e2e8f0; }
+
+        .bio-support-note { font-size: 11px; color: #94a3b8; text-align: center; margin-top: 10px; }
+        .bio-badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+        .bio-badge.enrolled { background: #dcfce7; color: #15803d; }
+        .bio-badge.not-enrolled { background: #fee2e2; color: #b91c1c; }
+
+        .bio-login-btn{
+            width:100%; margin-top:10px; padding:11px 14px; border:1px solid #bfdbfe;
+            border-radius:10px; background:linear-gradient(135deg,#eff6ff,#dbeafe);
+            color:#1d4ed8; font-size:15px; font-weight:700; cursor:pointer;
+        }
+        .bio-login-btn:hover{background:#dbeafe}
+        .bio-login-status{min-height:18px;text-align:center;font-size:12px;color:#64748b;margin-top:7px}
+        .security-bio-card{
+            display:flex;align-items:center;justify-content:space-between;gap:12px;
+            margin:15px 0;padding:14px;border:1px solid #bfdbfe;border-radius:12px;
+            background:#eff6ff;
+        }
+        .security-bio-status{font-size:12px;color:#64748b;margin-top:4px}
+        @media(max-width:600px){.security-bio-card{flex-direction:column;align-items:stretch}}
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- লগইন সেকশন -->
+    <div id="loginSection" class="login-box">
+        <h2 style="text-align: center; margin-top: 0; color: #1a73e8;">লগইন করুন</h2>
+        <div class="form-group">
+            <label for="usernameInput">ইউজার আইডি (Username/ID):</label>
+            <input type="text" id="usernameInput" placeholder="যেমন: admin বা P001">
+        </div>
+        <div class="form-group">
+            <label for="passwordInput">পাসওয়ার্ড (Password):</label>
+            <input type="password" id="passwordInput" placeholder="পাসওয়ার্ড দিন">
+        </div>
+        <button class="btn" onclick="login()">লগইন</button>
+        <button type="button" class="bio-login-btn" onclick="biometricLogin()">🔐 Biometric দিয়ে প্রবেশ</button>
+        <div id="bioLoginStatus" class="bio-login-status"></div>
+        <a href="javascript:void(0)" class="forgot-link" onclick="handleForgotPassword()">Forget Password?</a>
+    </div>
+
+    <!-- মূল অ্যাপ্লিকেশন সেকশন -->
+    <div id="databaseRecordStatus" style="position:fixed;right:10px;bottom:10px;z-index:9999;padding:7px 10px;border-radius:10px;background:#0f172a;color:#fff;font-size:11px;opacity:.88">Firebase: সংযোগ হচ্ছে…</div>
+    <div id="appSection" style="display: none;">
+        <h1>ইনভেন্টরি ও কর্মী খাতা <span style="font-size:12px;color:#64748b;font-weight:600;">Professional Management System</span></h1>
+
+        <!-- ইউজার বার -->
+        <div class="user-bar">
+            <div class="bar-left">
+                <button class="btn-back" onclick="goBack()">⬅ Back</button>
+                <div class="user-info">
+                    বর্তমান ইউজার: <span id="currentUserName"></span>
+                    <span id="currentUserRole" class="user-badge"></span>
+                </div>
+            </div>
+            <div>
+                <button class="btn-settings" onclick="toggleSettingsModal()">⚙️ সিকিউরিটি সেটিং</button>
+                <button class="btn-logout" onclick="logout()">লগআউট</button>
+            </div>
+        </div>
+
+        <!-- সিকিউরিটি সেটিং -->
+        <div id="settingsCard" class="card settings-card no-print" style="display: none;">
+            <h2>⚙️ সিকিউরিটি সেটিং</h2>
+            <form id="changeSecurityForm" onsubmit="saveSecuritySettings(event)">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="newUsername">ইউজার আইডি (অপরিবর্তনযোগ্য):</label>
+                        <input type="text" id="newUsername" readonly style="background-color: #e9ecef;">
+                    </div>
+                    <div class="form-group">
+                        <label for="newPassword">নতুন পাসওয়ার্ড:</label>
+                        <input type="password" id="newPassword" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="newPin">নতুন সিকিউরিটি পিন (PIN):</label>
+                        <input type="password" id="newPin" maxlength="6" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="confirmOldPin" style="color: #d93025;">বর্তমান সিকিউরিটি পিন:</label>
+                    <input type="password" id="confirmOldPin" maxlength="6" required>
+                </div>
+                <div class="security-bio-card">
+                    <div>
+                        <strong>🔐 Biometric Entry</strong>
+                        <div class="security-bio-status" id="securityBioStatus">এই ডিভাইসে PIN-এর পাশাপাশি Biometric দিয়ে এন্ট্রি চালু করা যাবে।</div>
+                    </div>
+                    <button type="button" class="bio-btn-primary" style="max-width:220px" onclick="enrollCurrentUserBiometric()">Biometric চালু করুন</button>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button type="submit" class="btn" style="background-color: #28a745;">পরিবর্তন সেভ করুন</button>
+                    <button type="button" class="btn-secondary" onclick="toggleSettingsModal()">বাতিল করুন</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- ড্যাশবোর্ড ও আইকন প্যানেল -->
+        <div class="card no-print">
+            <div class="dashboard-header">
+                <div class="dashboard-title">📊 ড্যাশবোর্ড মেনু</div>
+            </div>
+
+            <div class="app-icon-row">
+                <!-- ডাটা এন্ট্রি আইকন -->
+                <button type="button" class="app-icon-btn" id="btn-data-entry" onclick="switchFeature('data-entry')">
+                    <div class="icon-circle bg-data-entry">📝</div>
+                    <span class="label">এন্ট্রি করুন</span>
+                </button>
+
+                <!-- রিপোর্ট ও খাতা দেখার আইকন -->
+                <button type="button" class="app-icon-btn" id="btn-view-report" onclick="switchFeature('view-report')">
+                    <div class="icon-circle bg-view-report">📋</div>
+                    <span class="label">খাতা/রিপোর্ট</span>
+                </button>
+
+                <!-- অ্যাডমিন আইকনসমূহ -->
+                <button type="button" class="app-icon-btn admin-only" id="btn-add-worker" onclick="addWorkerPrompt()">
+                    <div class="icon-circle bg-add-worker">👤</div>
+                    <span class="label">+কর্মী</span>
+                </button>
+
+                <button type="button" class="app-icon-btn admin-only" id="btn-manage-worker" onclick="switchFeature('manage-worker')">
+                    <div class="icon-circle bg-manage-worker">👥</div>
+                    <span class="label">কর্মী খাতা</span>
+                </button>
+
+                <button type="button" class="app-icon-btn admin-only" id="btn-add-item" onclick="addItemPrompt()">
+                    <div class="icon-circle bg-add-item">📦</div>
+                    <span class="label">+আইটেম</span>
+                </button>
+
+                <button type="button" class="app-icon-btn admin-only" id="btn-manage-item" onclick="switchFeature('manage-item')">
+                    <div class="icon-circle bg-manage-item">🏷️</div>
+                    <span class="label">আইটেম লিস্ট</span>
+                </button>
+
+                <button type="button" class="app-icon-btn admin-only" id="btn-add-user" onclick="addUserPrompt()">
+                    <div class="icon-circle bg-add-user">🆔</div>
+                    <span class="label">+স্টাফ</span>
+                </button>
+            </div>
+
+            <!-- সক্রিয় ফিচারের প্যানেলসমূহ -->
+            
+            <!-- ১. কর্মী খাতা দেখার প্যানেল -->
+            <div id="panel-manage-worker" class="feature-panel item-list-box" style="background: #f3e8ff; border-color: #d8b4fe;">
+                <label style="margin-bottom: 8px; font-size: 13px; color: #555;">👥 বিদ্যমান কর্মীদের তালিকা:</label>
+                <div id="workerListContainer"></div>
+            </div>
+
+            <!-- ২. আইটেম লিস্ট দেখার প্যানেল -->
+            <div id="panel-manage-item" class="feature-panel item-list-box">
+                <label style="margin-bottom: 8px; font-size: 13px; color: #555;">🏷️ বিদ্যমান আইটেমের তালিকা:</label>
+                <div id="itemListContainer"></div>
+            </div>
+        </div>
+
+        <!-- ৩. ডাটা এন্ট্রি ফর্ম প্যানেল -->
+        <div id="panel-data-entry" class="card no-print feature-panel">
+            <h2 id="formTitle">নতুন এন্ট্রি (কাজ / পেমেন্ট)</h2>
+            
+            <form id="inventoryForm" onsubmit="handleFormSubmit(event)">
+                <input type="hidden" id="editKey" value="">
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="entryType">এন্ট্রির ধরন:</label>
+                        <select id="entryType" onchange="toggleFormFields()" required>
+                            <option value="WORK">🛠️ কাজের হিসাব</option>
+                            <option value="ADVANCE">🟧 Advance (অগ্রিম পেমেন্ট)</option>
+                            <option value="PAID">🟩 Paid (সম্পূর্ণ/বকেয়া মেটানো)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="workerSelect">কর্মী নির্বাচন করুন:</label>
+                        <select id="workerSelect" required onchange="autoFillRate()">
+                            <option value="">কর্মী বেছে নিন</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="date">তারিখ:</label>
+                        <input type="date" id="date" required>
+                    </div>
+                </div>
+
+                <!-- কাজের ফিল্ড -->
+                <div id="workFields">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="item">আইটেমের নাম:</label>
+                            <select id="item" onchange="autoFillRate()">
+                                <option value="">আইটেম নির্বাচন করুন</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="quantity">পরিমাণ (পিস):</label>
+                            <input type="number" id="quantity" placeholder="যেমন: ১২০">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>রেটের ধরন নির্বাচন করুন:</label>
+                        <div class="rate-type-container">
+                            <label><input type="radio" name="rateType" value="12" checked onchange="updateRateNote()"> প্রতি ১২ পিস / ডজন রেট</label>
+                            <label><input type="radio" name="rateType" value="1" onchange="updateRateNote()"> প্রতি ১ পিস রেট</label>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="rate" id="rateLabel">রেট (টাকা):</label>
+                        <input type="number" step="0.01" id="rate" placeholder="রেট লিখুন (আইটেম সিলেক্ট করলে আগের রেট আসবে)">
+                        <div class="note" id="rateNote">* মোট টাকা = (পরিমাণ ÷ ১২) × রেট</div>
+                        <div class="note" id="rateAutoHint" style="color:#15803d;display:none;"></div>
+                    </div>
+                </div>
+
+                <!-- পেমেন্ট ফিল্ড -->
+                <div id="paymentFields" style="display: none;">
+                    <div class="form-group">
+                        <label for="paymentAmount">পেমেন্টের পরিমাণ (টাকা):</label>
+                        <input type="number" step="0.01" id="paymentAmount" placeholder="টাকার পরিমাণ লিখুন">
+                    </div>
+                    <div class="form-group">
+                        <label for="paymentNote">নোট/বিবরণ (ঐচ্ছিক):</label>
+                        <input type="text" id="paymentNote" placeholder="যেমন: ক্যাশ / অনলাইন পেমেন্ট">
+                    </div>
+                </div>
+
+                <div class="pin-box">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="entryPin" style="color: #856404;">🔒 Admin PIN অথবা Biometric:</label>
+                        <input type="password" id="entryPin" placeholder="Admin PIN লিখুন (অথবা খালি রেখে Biometric)" maxlength="6">
+                        <div class="note" style="margin-top:6px;color:#856404;">* Admin PIN দিন, অথবা PIN খালি রেখে Biometric ব্যবহার করুন</div>
+                    </div>
+                </div>
+
+                <button type="submit" id="submitBtn" class="btn">ডাটা যোগ করুন</button>
+            </form>
+        </div>
+
+        <!-- ৪. রিপোর্ট ও খাতা টেবিল -->
+        <div id="panel-view-report" class="card feature-panel">
+            <div class="header-flex">
+                <h2>খাতা ও রিপোর্ট <span id="reportRecordCount" style="font-size:13px;color:#64748b;font-weight:600;"></span></h2>
+                <div>
+                    <button class="btn-secondary" type="button" onclick="resetReportFilters()" style="margin-right:6px;">🔄 সব দেখুন</button>
+                    <button class="btn-secondary" type="button" onclick="reloadFirebaseData()" style="margin-right:6px;">☁ রিফ্রেশ</button>
+                    <button class="btn-print" onclick="generatePDF()">📄 PDF ডাউনলোড</button>
+                </div>
+            </div>
+
+            <div id="reportEmptyHint" class="no-print" style="display:none;padding:14px;margin-bottom:12px;border-radius:12px;background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;font-size:14px;font-weight:600;"></div>
+
+            <div class="form-row no-print" style="margin-bottom: 15px;">
+                <div class="form-group">
+                    <label for="filterWorker">কর্মী সিলেক্ট করুন:</label>
+                    <select id="filterWorker" onchange="renderTable()">
+                        <option value="ALL">সকল কর্মী (সব রেকর্ড)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="filterMonth">মাসিক রিপোর্ট (মাস বেছে নিন):</label>
+                    <select id="filterMonth" onchange="renderTable()">
+                        <option value="ALL">সকল মাস (সব সময়)</option>
+                    </select>
+                </div>
+            </div>
+
+            <h3 id="reportHeader" style="text-align: center; color: #333; display: none;"></h3>
+
+            <div class="summary-card">
+                <div class="summary-grid">
+                    <div class="summary-item">
+                        <h4>মোট কাজ</h4>
+                        <div class="val" id="summaryTotalWork" style="color: #0d6efd;">₹0.00</div>
+                    </div>
+                    <div class="summary-item">
+                        <h4>মোট Advance</h4>
+                        <div class="val" id="summaryTotalAdvance" style="color: #fd7e14;">₹0.00</div>
+                    </div>
+                    <div class="summary-item">
+                        <h4>মোট Paid</h4>
+                        <div class="val" id="summaryTotalPaid" style="color: #198754;">₹0.00</div>
+                    </div>
+                    <div class="summary-item" style="background: #e8f0fe;">
+                        <h4>বর্তমান স্ট্যাটাস (Due/Advance)</h4>
+                        <div class="val" id="summaryBalance" style="color: #dc3545;">₹0.00</div>
+                    </div>
+                </div>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 50px;">নং</th>
+                        <th>তারিখ</th>
+                        <th>টাইপ</th>
+                        <th>কর্মীর নাম</th>
+                        <th>আইটেম / বিবরণ</th>
+                        <th>পরিমাণ (পিস)</th>
+                        <th>রেট</th>
+                        <th>মোট টাকা</th>
+                        <th class="no-print">অ্যাকশন</th>
+                    </tr>
+                </thead>
+                <tbody id="dataTable">
+                </tbody>
+                <tfoot>
+                    <tr style="font-weight: bold; background-color: #e9ecef;">
+                        <td colspan="5" style="text-align: right;">মোট পরিমাণ (পিস):</td>
+                        <td id="totalQuantity">0</td>
+                        <td colspan="1">-</td>
+                        <td id="grandTotal">₹0.00</td>
+                        <td class="no-print"></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ===== Biometric Enrollment Modal ===== -->
+<div class="bio-modal-overlay" id="bioModalOverlay">
+    <div class="bio-modal">
+        <h3>👤 নতুন কারিগর যোগ</h3>
+        <p class="bio-sub">কারিগরের তথ্য দিন এবং Biometric নথিভুক্ত করুন</p>
+
+        <div class="form-group">
+            <label for="bioWorkerName">কারিগরের নাম *</label>
+            <input type="text" id="bioWorkerName" placeholder="পুরো নাম লিখুন">
+        </div>
+        <div class="form-group">
+            <label for="bioWorkerPhone">মোবাইল নম্বর (ঐচ্ছিক)</label>
+            <input type="tel" id="bioWorkerPhone" placeholder="যেমন: 9876543210">
+        </div>
+
+        <div class="bio-fingerprint-box" id="bioFingerprintBox" onclick="startBiometricEnroll()">
+            <div class="bio-fp-icon" id="bioFpIcon">🫵</div>
+            <div class="bio-fp-label" id="bioFpLabel">Biometric যোগ করতে ক্লিক করুন</div>
+            <div class="bio-fp-status" id="bioFpStatus">আঙুলের ছাপ / Face ID ব্যবহার করুন</div>
+        </div>
+
+        <div class="bio-modal-actions">
+            <button class="bio-btn-secondary" onclick="closeBioModal()">বাতিল</button>
+            <button class="bio-btn-primary" id="bioSaveBtn" onclick="saveBioWorker()">কারিগর সংরক্ষণ করুন</button>
+        </div>
+        <div class="bio-support-note" id="bioSupportNote"></div>
+    </div>
+</div>
+
+<script>
+    const Storage = {
+        get: function(key) {
+            try { return localStorage.getItem(key); } 
+            catch (e) { return window[key] || null; }
+        },
+        set: function(key, val) {
+            try { localStorage.setItem(key, val); } 
+            catch (e) { window[key] = val; }
+        },
+        remove: function(key) {
+            try { localStorage.removeItem(key); } 
+            catch (e) { delete window[key]; }
+        }
+    };
+
+    if (typeof firebaseApp === 'undefined') {
+        var firebaseApp = firebase.initializeApp({
+            apiKey: "AIzaSyDMIwdy_UYOf7_ASiWzTIS0t155CeUnttY",
+            authDomain: "my-inventory-app-b734f.firebaseapp.com",
+            databaseURL: "https://my-inventory-app-b734f-default-rtdb.firebaseio.com",
+            projectId: "my-inventory-app-b734f",
+            storageBucket: "my-inventory-app-b734f.firebasestorage.app",
+            messagingSenderId: "975445427374",
+            appId: "1:975445427374:web:8cc426024ff82bb055593f"
+        });
+    }
+    const db = firebase.database();
+
+    const defaultUsers = {
+        'admin': { username: 'admin', password: '123', pin: '9999', role: 'admin', name: 'অ্যাডমিন' }
+    };
+
+    let users = defaultUsers;
+    let workers = [];
+    let workersLoaded = false;
+    let items = [];
+    let inventoryData = {};
+    let currentUser = null;
+
+    try {
+        currentUser = JSON.parse(Storage.get('sunu_current_user')) || null;
+    } catch(e) { currentUser = null; }
+
+    const loginSection = document.getElementById('loginSection');
+    const appSection = document.getElementById('appSection');
+    const inventoryForm = document.getElementById('inventoryForm');
+    const dataTable = document.getElementById('dataTable');
+    const submitBtn = document.getElementById('submitBtn');
+    const formTitle = document.getElementById('formTitle');
+    const editKeyInput = document.getElementById('editKey');
+
+    const workerSelect = document.getElementById('workerSelect');
+    const itemSelect = document.getElementById('item');
+    const filterWorker = document.getElementById('filterWorker');
+    const filterMonth = document.getElementById('filterMonth');
+
+    document.getElementById('date').valueAsDate = new Date();
+
+    const DB_REST = 'https://my-inventory-app-b734f-default-rtdb.firebaseio.com';
+    let realtimeConnected = false;
+    let restFallbackUsed = false;
+
+    function setDbStatus(msg, isError) {
+        const s = document.getElementById('databaseRecordStatus');
+        if (!s) return;
+        s.textContent = msg;
+        s.style.background = isError ? '#b91c1c' : '#0f172a';
+    }
+
+    function applyUsersData(remoteUsers) {
+        users = { ...defaultUsers, ...(remoteUsers || {}) };
+        if (currentUser) {
+            if (users[currentUser.username]) {
+                currentUser = users[currentUser.username];
+                Storage.set('sunu_current_user', JSON.stringify(currentUser));
+            } else {
+                logout();
+                return;
+            }
+        }
+        renderWorkerManagementList();
+    }
+
+    function applyWorkersData(val) {
+        workers = Array.isArray(val) ? val : (val ? Object.values(val) : []);
+        workersLoaded = true;
+        populateDropdowns();
+        renderWorkerManagementList();
+    }
+
+    function applyItemsData(val) {
+        items = Array.isArray(val) ? val : (val ? Object.values(val) : []);
+        populateDropdowns();
+        renderItemManagementList();
+    }
+
+    function applyInventoryData(val) {
+        inventoryData = val || {};
+        populateMonthDropdown();
+        renderTable();
+        const n = Object.keys(inventoryData).length;
+        setDbStatus('Firebase: ' + n + 'টি রেকর্ড লোড ✓' + (restFallbackUsed ? ' (REST)' : ''), false);
+    }
+
+    // Realtime listeners (WebSocket)
+    try {
+        db.ref('users').on('value', snap => {
+            realtimeConnected = true;
+            applyUsersData(snap.val() || {});
+        }, err => console.error('users', err));
+
+        db.ref('workers').on('value', snap => {
+            realtimeConnected = true;
+            applyWorkersData(snap.val());
+        }, err => console.error('workers', err));
+
+        db.ref('items').on('value', snap => {
+            realtimeConnected = true;
+            applyItemsData(snap.val());
+        }, err => console.error('items', err));
+
+        db.ref('inventory').on('value', snap => {
+            realtimeConnected = true;
+            applyInventoryData(snap.val() || {});
+        }, err => {
+            console.error('inventory', err);
+            setDbStatus('Firebase Realtime ব্যর্থ — REST চেষ্টা হচ্ছে…', true);
+            loadAllViaRest();
+        });
+    } catch (e) {
+        console.error('realtime setup failed', e);
+        loadAllViaRest();
+    }
+
+    async function loadAllViaRest() {
+        if (realtimeConnected && Object.keys(inventoryData || {}).length > 0) return;
+        setDbStatus('Firebase: REST দিয়ে লোড হচ্ছে…', false);
+        try {
+            const [u, w, i, inv] = await Promise.all([
+                fetch(DB_REST + '/users.json').then(r => r.json()),
+                fetch(DB_REST + '/workers.json').then(r => r.json()),
+                fetch(DB_REST + '/items.json').then(r => r.json()),
+                fetch(DB_REST + '/inventory.json').then(r => r.json())
+            ]);
+            restFallbackUsed = true;
+            applyUsersData(u || {});
+            applyWorkersData(w);
+            applyItemsData(i);
+            applyInventoryData(inv || {});
+            // itemRates ক্যাশ
+            try {
+                const rates = await fetch(DB_REST + '/itemRates.json').then(r => r.json());
+                if (rates) {
+                    itemRateCache = { ...itemRateCache, ...rates };
+                    Storage.set('sunu_item_rates', JSON.stringify(itemRateCache));
+                }
+            } catch (e2) {}
+        } catch (err) {
+            console.error('REST load failed', err);
+            setDbStatus('Firebase: লোড ব্যর্থ — Chrome-এ ফাইল খুলুন / নেটওয়ার্ক চেক', true);
+        }
+    }
+
+    // ২.৫ সেকেন্ডে Realtime না এলে REST fallback
+    setTimeout(function() {
+        if (!realtimeConnected || Object.keys(inventoryData || {}).length === 0) {
+            loadAllViaRest();
+        }
+    }, 2500);
+
+    // ম্যানুয়াল রিফ্রেশ
+    window.reloadFirebaseData = loadAllViaRest;
+
+    async function saveWorkersSafely() {
+        if (!workersLoaded) {
+            alert('⏳ আগের কর্মী রেকর্ড Firebase থেকে সম্পূর্ণ লোড হওয়া পর্যন্ত অপেক্ষা করুন। পুরোনো ডাটা সুরক্ষার জন্য এই আপডেট বন্ধ রাখা হয়েছে।');
+            return false;
+        }
+        try {
+            await db.ref('workers').set(workers);
+        } catch (e) {
+            // REST fallback write
+            await fetch(DB_REST + '/workers.json', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(workers)
+            });
+        }
+        return true;
+    }
+
+    window.onload = function() {
+        if (currentUser) {
+            showApp();
+        } else {
+            showLogin();
+        }
+    };
+
+    function login() {
+        const u = document.getElementById('usernameInput').value.trim();
+        const p = document.getElementById('passwordInput').value.trim();
+
+        if (!u || !p) { alert('❌ ইউজার আইডি ও পাসওয়ার্ড দিন!'); return; }
+
+        if (users[u] && String(users[u].password) === p) {
+            currentUser = users[u];
+            Storage.set('sunu_current_user', JSON.stringify(currentUser));
+            showApp();
+        } else {
+            alert("❌ ভুল ইউজার আইডি বা পাসওয়ার্ড!");
+        }
+    }
+
+    function logout() {
+        currentUser = null;
+        Storage.remove('sunu_current_user');
+        showLogin();
+    }
+
+    function goBack() {
+        if (window.history.length > 1) {
+            window.history.back();
+        } else {
+            logout();
+        }
+    }
+
+    function showLogin() {
+        loginSection.style.display = 'block';
+        appSection.style.display = 'none';
+        document.getElementById('usernameInput').value = '';
+        document.getElementById('passwordInput').value = '';
+    }
+
+    function showApp() {
+        loginSection.style.display = 'none';
+        appSection.style.display = 'block';
+
+        document.getElementById('currentUserName').innerText = currentUser.name || currentUser.username;
+        const roleBadge = document.getElementById('currentUserRole');
+        roleBadge.innerText = (currentUser.role || 'staff').toUpperCase();
+
+        const adminOnlyElements = document.querySelectorAll('.admin-only');
+        adminOnlyElements.forEach(el => {
+            el.style.display = currentUser.role === 'admin' ? 'flex' : 'none';
+        });
+
+        populateDropdowns();
+        renderTable();
+
+        hideAllFeatures();
+        // লগইনের পর রিপোর্ট প্যানেল স্বয়ংক্রিয় খুলুন
+        switchFeature('view-report');
+    }
+
+    function hideAllFeatures() {
+        const iconBtns = document.querySelectorAll('.app-icon-btn');
+        iconBtns.forEach(btn => btn.classList.remove('active'));
+
+        const panels = document.querySelectorAll('.feature-panel');
+        panels.forEach(panel => panel.style.display = 'none');
+    }
+
+    /* মূল ড্যাশবোর্ড সুইচিং সিস্টেম */
+    function switchFeature(featureName) {
+        const selectedBtn = document.getElementById('btn-' + featureName);
+        const selectedPanel = document.getElementById('panel-' + featureName);
+
+        const isAlreadyActive = selectedBtn && selectedBtn.classList.contains('active');
+
+        hideAllFeatures();
+
+        if (!isAlreadyActive && selectedPanel) {
+            if (selectedBtn) selectedBtn.classList.add('active');
+            selectedPanel.style.display = 'block';
+            
+            // স্মুথ স্ক্রোল
+            selectedPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }
+
+    function toggleFormFields() {
+        const type = document.getElementById('entryType').value;
+        const workFields = document.getElementById('workFields');
+        const paymentFields = document.getElementById('paymentFields');
+
+        if (type === 'WORK') {
+            workFields.style.display = 'block';
+            paymentFields.style.display = 'none';
+        } else {
+            workFields.style.display = 'none';
+            paymentFields.style.display = 'block';
+        }
+    }
+
+    function updateRateNote() {
+        const rateType = document.querySelector('input[name="rateType"]:checked').value;
+        const note = document.getElementById('rateNote');
+        if (rateType === '12') {
+            note.innerText = '* মোট টাকা = (পরিমাণ ÷ ১২) × রেট';
+        } else {
+            note.innerText = '* মোট টাকা = পরিমাণ × রেট';
+        }
+    }
+
+    /* ===== রেট মনে রাখা (আইটেম অনুযায়ী) ===== */
+    let itemRateCache = {};
+    try {
+        itemRateCache = JSON.parse(Storage.get('sunu_item_rates') || '{}') || {};
+    } catch (e) { itemRateCache = {}; }
+
+    // Firebase থেকেও রেট ক্যাশ লোড
+    db.ref('itemRates').on('value', snap => {
+        const remote = snap.val() || {};
+        itemRateCache = { ...itemRateCache, ...remote };
+        try { Storage.set('sunu_item_rates', JSON.stringify(itemRateCache)); } catch (e) {}
+    });
+
+    function saveItemRate(itemName, rate, rateType, worker) {
+        if (!itemName || !(rate > 0)) return;
+        const key = itemName;
+        const entry = {
+            rate: Number(rate),
+            rateType: String(rateType || '12'),
+            worker: worker || '',
+            updatedAt: new Date().toISOString()
+        };
+        itemRateCache[key] = entry;
+        // worker-specific keyও রাখি (একই আইটেমে কর্মীভেদে রেট আলাদা হতে পারে)
+        if (worker) {
+            itemRateCache[key + '||' + worker] = entry;
+        }
+        try { Storage.set('sunu_item_rates', JSON.stringify(itemRateCache)); } catch (e) {}
+        db.ref('itemRates/' + key.replace(/[.#$\/\[\]]/g, '_')).set(entry).catch(() => {});
+        if (worker) {
+            const wKey = (key + '__' + worker).replace(/[.#$\/\[\]]/g, '_');
+            db.ref('itemRates/' + wKey).set(entry).catch(() => {});
+        }
+    }
+
+    function findLastRateFromHistory(itemName, workerName) {
+        if (!itemName || !inventoryData) return null;
+        let bestSameWorker = null;
+        let bestAny = null;
+        const keys = Object.keys(inventoryData);
+        // নতুন থেকে পুরনো (keys সাধারণত push id, reverse করে নতুন আগে)
+        for (let i = keys.length - 1; i >= 0; i--) {
+            const row = inventoryData[keys[i]];
+            if (!row || (row.entryType || '').toUpperCase() !== 'WORK') continue;
+            if (row.item !== itemName) continue;
+            if (!(Number(row.rate) > 0)) continue;
+            const found = {
+                rate: Number(row.rate),
+                rateType: row.rateType || '12',
+                worker: row.worker || '',
+                date: row.date || ''
+            };
+            if (workerName && row.worker === workerName) {
+                if (!bestSameWorker) bestSameWorker = found;
+            }
+            if (!bestAny) bestAny = found;
+            if (bestSameWorker && bestAny) break;
+        }
+        return bestSameWorker || bestAny;
+    }
+
+    function autoFillRate() {
+        // এডিট মোডে থাকলে অটো-ফিল বন্ধ (ইউজার যে রেট এডিট করছে সেটা নষ্ট হবে না)
+        if (editKeyInput && editKeyInput.value) return;
+
+        const itemName = itemSelect.value;
+        const workerName = workerSelect.value;
+        const rateInput = document.getElementById('rate');
+        const hint = document.getElementById('rateAutoHint');
+        if (!itemName) {
+            if (hint) { hint.style.display = 'none'; hint.textContent = ''; }
+            return;
+        }
+
+        let found = null;
+        // ১) একই আইটেম + একই কর্মী ক্যাশ
+        if (workerName && itemRateCache[itemName + '||' + workerName]) {
+            found = itemRateCache[itemName + '||' + workerName];
+        }
+        // ২) আইটেম ক্যাশ
+        if (!found && itemRateCache[itemName]) {
+            found = itemRateCache[itemName];
+        }
+        // ৩) পুরনো এন্ট্রি থেকে
+        if (!found) {
+            found = findLastRateFromHistory(itemName, workerName);
+        }
+
+        if (found && Number(found.rate) > 0) {
+            rateInput.value = found.rate;
+            const rateRadios = document.getElementsByName('rateType');
+            for (const r of rateRadios) {
+                if (r.value === String(found.rateType || '12')) r.checked = true;
+            }
+            updateRateNote();
+            if (hint) {
+                const src = found.date ? ('শেষ এন্ট্রি: ' + found.date) : 'আগের রেট';
+                hint.style.display = 'block';
+                hint.textContent = '✓ রেট অটো-ভরা হয়েছে (' + src + ') — প্রয়োজনে বদলাতে পারবেন';
+            }
+        } else {
+            if (hint) { hint.style.display = 'none'; hint.textContent = ''; }
+        }
+    }
+
+    function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>\"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#039;'}[ch]));
+    }
+
+    function populateDropdowns() {
+        const currentSelectedWorker = workerSelect.value;
+        const currentFilterWorker = filterWorker.value;
+
+        workerSelect.innerHTML = '<option value="">কর্মী বেছে নিন</option>';
+        filterWorker.innerHTML = '<option value="ALL">সকল কর্মী (সব রেকর্ড)</option>';
+
+        workers.forEach((w, index) => {
+            const wName = (typeof w === 'object' && w !== null) ? w.name : w;
+            if(wName) {
+                const serialStr = String(index + 1).padStart(3, '0');
+                const displayText = `${serialStr}. ${escapeHtml(wName)}`;
+
+                workerSelect.innerHTML += `<option value="${escapeHtml(wName)}">${displayText}</option>`;
+                filterWorker.innerHTML += `<option value="${escapeHtml(wName)}">${displayText}</option>`;
+            }
+        });
+
+        workerSelect.value = currentSelectedWorker;
+        filterWorker.value = currentFilterWorker || "ALL";
+
+        const currentSelectedItem = itemSelect.value;
+        itemSelect.innerHTML = '<option value="">আইটেম নির্বাচন করুন</option>';
+        items.forEach(i => {
+            if(i) itemSelect.innerHTML += `<option value="${i}">${i}</option>`;
+        });
+        if (currentSelectedItem) itemSelect.value = currentSelectedItem;
+    }
+
+    function populateMonthDropdown() {
+        const months = new Set();
+        Object.values(inventoryData).forEach(item => {
+            if (item && item.date) {
+                months.add(item.date.substring(0, 7));
+            }
+        });
+
+        const sortedMonths = Array.from(months).sort().reverse();
+        filterMonth.innerHTML = '<option value="ALL">সকল মাস (সব সময়)</option>';
+        sortedMonths.forEach(m => {
+            filterMonth.innerHTML += `<option value="${m}">${m}</option>`;
+        });
+    }
+
+    async function handleFormSubmit(e) {
+        e.preventDefault();
+        if (!currentUser) { alert('❌ আগে লগইন করুন!'); return; }
+
+        const pin = document.getElementById('entryPin').value.trim();
+        let entryUnlocked = false;
+
+        // Admin PIN অথবা বর্তমান ইউজারের Biometric
+        const adminUser = users['admin'] || Object.values(users).find(function(u) { return u && u.role === 'admin'; });
+        const adminPin = adminUser ? String(adminUser.pin || '') : '';
+
+        if (pin && adminPin && pin === adminPin) {
+            entryUnlocked = true;
+        } else if (currentUser.biometricId) {
+            entryUnlocked = await verifyEntryBiometric();
+            if (entryUnlocked) {
+                document.getElementById('entryPin').value = '';
+            }
+        }
+
+        if (!entryUnlocked) {
+            alert("❌ Admin PIN ভুল অথবা Biometric যাচাই ব্যর্থ হয়েছে!\n\n• Admin PIN দিন (ডিফল্ট 9999), অথবা\n• PIN খালি রেখে Biometric ব্যবহার করুন");
+            return;
+        }
+
+        const editKey = editKeyInput.value;
+        const entryType = document.getElementById('entryType').value;
+        const worker = workerSelect.value;
+        const date = document.getElementById('date').value;
+
+        if (!worker || !date) {
+            alert("❌ অনুগ্রহ করে কর্মী এবং তারিখ সঠিকভাবে দিন!");
+            return;
+        }
+
+        let entryData = {
+            entryType,
+            worker,
+            date,
+            createdBy: currentUser.username,
+            updatedAt: new Date().toISOString()
+        };
+
+        if (entryType === 'WORK') {
+            const item = itemSelect.value;
+            const quantity = parseFloat(document.getElementById('quantity').value) || 0;
+            const rateType = document.querySelector('input[name="rateType"]:checked').value;
+            const rate = parseFloat(document.getElementById('rate').value) || 0;
+
+            if (!item || quantity <= 0 || rate <= 0) {
+                alert("❌ আইটেম এবং পরিমাণ সঠিক দেওয়া আবশ্যক!");
+                return;
+            }
+
+            let total = (rateType === '12') ? (quantity / 12) * rate : quantity * rate;
+
+            entryData.item = item;
+            entryData.quantity = quantity;
+            entryData.rateType = rateType;
+            entryData.rate = rate;
+            entryData.total = parseFloat(total.toFixed(2));
+            // পরের এন্ট্রির জন্য রেট মনে রাখুন
+            saveItemRate(item, rate, rateType, worker);
+        } else {
+            const amount = parseFloat(document.getElementById('paymentAmount').value) || 0;
+            const note = document.getElementById('paymentNote').value.trim();
+
+            if (amount <= 0) {
+                alert("❌ পেমেন্টের পরিমাণ সঠিক দিন!");
+                return;
+            }
+
+            entryData.total = parseFloat(amount.toFixed(2));
+            entryData.note = note || (entryType === 'ADVANCE' ? 'Advance Payment' : 'Paid');
+        }
+
+        if (editKey) {
+            const existing = inventoryData[editKey];
+            if (!existing) { alert('❌ রেকর্ডটি আর পাওয়া যাচ্ছে না!'); return; }
+            if (currentUser.role !== 'admin' && existing.createdBy !== currentUser.username) { alert('❌ এই রেকর্ড সম্পাদনা করার অনুমতি নেই!'); return; }
+            try {
+                await db.ref('inventory/' + editKey).set(entryData);
+            } catch (err) {
+                const resp = await fetch(DB_REST + '/inventory/' + editKey + '.json', {
+                    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(entryData)
+                });
+                if (!resp.ok) { alert('❌ আপডেট ব্যর্থ'); return; }
+            }
+            inventoryData[editKey] = entryData;
+            renderTable();
+            alert('✅ রেকর্ড সফলভাবে আপডেট করা হয়েছে!');
+            sendSmsNotification(entryData);
+        } else {
+            let newKey = null;
+            try {
+                const ref = await db.ref('inventory').push(entryData);
+                newKey = ref.key;
+            } catch (err) {
+                newKey = 'rest_' + Date.now();
+                const resp = await fetch(DB_REST + '/inventory/' + newKey + '.json', {
+                    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(entryData)
+                });
+                if (!resp.ok) { alert('❌ ডাটা সংরক্ষণ ব্যর্থ'); return; }
+            }
+            if (newKey) inventoryData[newKey] = entryData;
+            renderTable();
+            alert('✅ নতুন রেকর্ড সফলভাবে যুক্ত করা হয়েছে!');
+            sendSmsNotification(entryData);
+            // REST মোডে থাকলে পুরো লিস্ট আবার লোড
+            if (restFallbackUsed) setTimeout(loadAllViaRest, 500);
+        }
+
+        resetForm();
+    }
+
+    /* ===== SMS Notification (Textbelt) ===== */
+    function getWorkerPhone(workerName) {
+        const w = workers.find(w => {
+            const name = (typeof w === 'object' && w !== null) ? w.name : w;
+            return name && name.toLowerCase() === (workerName || '').toLowerCase();
+        });
+        if (!w) return null;
+        const phone = (typeof w === 'object' && w !== null) ? (w.phone || '') : '';
+        const cleaned = phone.replace(/[\s\-]/g, '');
+        if (!/^\d{10}$/.test(cleaned)) return null;
+        return '+91' + cleaned;
+    }
+
+    function buildSmsText(entry) {
+        const dateStr = entry.date ? entry.date.split('-').reverse().join('/') : '-';
+        const type = (entry.entryType || '').toUpperCase();
+        if (type === 'WORK') {
+            return `[কারিগর খাতা] ${entry.worker} | ${dateStr} | ${entry.item} | ${entry.quantity} পিস | Rs.${entry.total}`;
+        } else if (type === 'ADVANCE') {
+            return `[কারিগর খাতা] ${entry.worker} | ${dateStr} | অগ্রিম পেয়েছেন: Rs.${entry.total}`;
+        } else if (type === 'PAID') {
+            return `[কারিগর খাতা] ${entry.worker} | ${dateStr} | পেমেন্ট: Rs.${entry.total}`;
+        }
+        return null;
+    }
+
+    async function sendSmsNotification(entryData) {
+        const phone = getWorkerPhone(entryData.worker);
+        if (!phone) return;
+        const message = buildSmsText(entryData);
+        if (!message) return;
+
+        try {
+            const resp = await fetch('https://textbelt.com/text', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ phone, message, key: 'textbelt' })
+            });
+            const result = await resp.json();
+            if (result.success) {
+                showSmsToast('✅ SMS পাঠানো হয়েছে: ' + phone);
+            } else {
+                showSmsToast('⚠️ SMS যায়নি: ' + (result.error || 'অজানা সমস্যা'));
+            }
+        } catch (err) {
+            showSmsToast('⚠️ SMS পাঠানো যায়নি (নেটওয়ার্ক সমস্যা)');
+        }
+    }
+
+    /* ===== PDF Generation (jsPDF + autoTable) ===== */
+    function generatePDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+        // --- ফিল্টার info ---
+        const selWorker = document.getElementById('filterWorker').value;
+        const selMonth  = document.getElementById('filterMonth').value;
+        const workerLabel = selWorker === 'ALL' ? 'সকল কারিগর' : selWorker;
+        const monthLabel  = selMonth  === 'ALL' ? 'সকল মাস'    : selMonth;
+
+        // --- Summary values ---
+        const totalWork    = document.getElementById('summaryTotalWork').innerText;
+        const totalAdvance = document.getElementById('summaryTotalAdvance').innerText;
+        const totalPaid    = document.getElementById('summaryTotalPaid').innerText;
+        const balance      = document.getElementById('summaryBalance').innerText;
+
+        // --- Table rows from DOM ---
+        const tbody = document.getElementById('dataTable');
+        const rows  = [];
+        tbody.querySelectorAll('tr').forEach(tr => {
+            const cells = tr.querySelectorAll('td');
+            if (cells.length < 8) return;
+            rows.push([
+                cells[0].innerText.trim(),  // নং
+                cells[1].innerText.trim(),  // তারিখ
+                cells[2].innerText.trim(),  // টাইপ
+                cells[3].innerText.trim(),  // কারিগর
+                cells[4].innerText.trim(),  // আইটেম
+                cells[5].innerText.trim(),  // পরিমাণ
+                cells[6].innerText.trim(),  // রেট
+                cells[7].innerText.trim(),  // মোট
+            ]);
+        });
+
+        const pageW = doc.internal.pageSize.getWidth();
+        let y = 14;
+
+        // --- Header bar ---
+        doc.setFillColor(15, 23, 42);
+        doc.rect(0, 0, pageW, 22, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(13);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Inventory & Karigar Khata', pageW / 2, 10, { align: 'center' });
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'normal');
+        doc.text('Professional Management System', pageW / 2, 16, { align: 'center' });
+        y = 28;
+
+        // --- Filter info ---
+        doc.setTextColor(50, 50, 50);
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        doc.text('Karigar: ' + workerLabel + '   |   Month: ' + monthLabel +
+                 '   |   Generated: ' + new Date().toLocaleString('en-IN'), 14, y);
+        y += 8;
+
+        // --- Summary box ---
+        doc.setFillColor(239, 246, 255);
+        doc.roundedRect(12, y, pageW - 24, 22, 3, 3, 'F');
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        const col = (pageW - 24) / 4;
+        const sx = 12;
+        [
+            ['Total Work', totalWork,    '#0d6efd'],
+            ['Advance',    totalAdvance, '#fd7e14'],
+            ['Paid',       totalPaid,    '#198754'],
+            ['Balance',    balance,      '#dc3545'],
+        ].forEach(([label, val, hex], i) => {
+            const cx = sx + col * i + col / 2;
+            doc.setTextColor(80, 80, 80);
+            doc.text(label, cx, y + 7, { align: 'center' });
+            // parse hex color
+            const r = parseInt(hex.slice(1,3),16);
+            const g = parseInt(hex.slice(3,5),16);
+            const b = parseInt(hex.slice(5,7),16);
+            doc.setTextColor(r, g, b);
+            doc.setFontSize(9);
+            doc.text(val, cx, y + 16, { align: 'center' });
+            doc.setFontSize(8);
+        });
+        y += 28;
+
+        // --- Main table ---
+        doc.autoTable({
+            startY: y,
+            head: [['#', 'Date', 'Type', 'Karigar', 'Item/Desc', 'Qty', 'Rate', 'Total']],
+            body: rows,
+            styles: {
+                fontSize: 7.5,
+                cellPadding: 2.5,
+                valign: 'middle',
+                textColor: [30, 30, 30],
+            },
+            headStyles: {
+                fillColor: [15, 23, 42],
+                textColor: [255, 255, 255],
+                fontStyle: 'bold',
+                fontSize: 8,
+            },
+            alternateRowStyles: { fillColor: [248, 250, 252] },
+            columnStyles: {
+                0: { halign: 'center', cellWidth: 10 },
+                1: { cellWidth: 22 },
+                2: { halign: 'center', cellWidth: 18 },
+                7: { halign: 'right', fontStyle: 'bold' },
+            },
+            margin: { left: 12, right: 12 },
+            didDrawPage: (data) => {
+                // Footer
+                const pCount = doc.internal.getNumberOfPages();
+                doc.setFontSize(7);
+                doc.setTextColor(150);
+                doc.text(
+                    'Page ' + data.pageNumber + ' of ' + pCount,
+                    pageW / 2,
+                    doc.internal.pageSize.getHeight() - 6,
+                    { align: 'center' }
+                );
+            }
+        });
+
+        // --- Save ---
+        const fname = 'Karigar_Report_' + (selWorker === 'ALL' ? 'All' : selWorker.replace(/\s+/g,'_'))
+                    + '_' + (selMonth === 'ALL' ? 'AllMonths' : selMonth) + '.pdf';
+        doc.save(fname);
+    }
+
+    function showSmsToast(msg) {
+        let toast = document.getElementById('smsToast');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'smsToast';
+            toast.style.cssText = [
+                'position:fixed','bottom:24px','left:50%','transform:translateX(-50%)',
+                'background:#0f172a','color:#fff','padding:12px 22px','border-radius:12px',
+                'font-size:14px','font-weight:600','z-index:99999',
+                'box-shadow:0 8px 24px rgba(0,0,0,0.25)',
+                'max-width:90vw','text-align:center'
+            ].join(';');
+            document.body.appendChild(toast);
+        }
+        toast.textContent = msg;
+        toast.style.display = 'block';
+        clearTimeout(toast._timer);
+        toast._timer = setTimeout(() => { toast.style.display = 'none'; }, 4500);
+    }
+
+
+    function resetForm() {
+        inventoryForm.reset();
+        editKeyInput.value = '';
+        formTitle.innerText = "নতুন এন্ট্রি (কাজ / পেমেন্ট)";
+        submitBtn.innerText = "ডাটা যোগ করুন";
+        document.getElementById('date').valueAsDate = new Date();
+        const hint = document.getElementById('rateAutoHint');
+        if (hint) { hint.style.display = 'none'; hint.textContent = ''; }
+        toggleFormFields();
+        updateRateNote();
+    }
+
+    function resetReportFilters() {
+        if (filterWorker) filterWorker.value = 'ALL';
+        if (filterMonth) filterMonth.value = 'ALL';
+        renderTable();
+    }
+
+    function renderTable() {
+        const selWorker = filterWorker ? filterWorker.value : 'ALL';
+        const selMonth = filterMonth ? filterMonth.value : 'ALL';
+
+        dataTable.innerHTML = '';
+
+        let totalQty = 0;
+        let totalWork = 0;
+        let totalAdvance = 0;
+        let totalPaid = 0;
+        let serialNo = 1;
+        let shownCount = 0;
+        const totalInDb = inventoryData && typeof inventoryData === 'object' ? Object.keys(inventoryData).length : 0;
+
+        if (inventoryData && typeof inventoryData === 'object') {
+            const keys = Object.keys(inventoryData).reverse();
+
+            keys.forEach(key => {
+                const row = inventoryData[key];
+
+                if (!row || typeof row !== 'object') return;
+
+                if (selWorker && selWorker !== 'ALL' && row.worker !== selWorker) return;
+                if (selMonth && selMonth !== 'ALL' && row.date && !row.date.startsWith(selMonth)) return;
+
+                shownCount++;
+                const numTotal = Number(row.total) || 0;
+                const numQty = Number(row.quantity) || 0;
+                const type = (row.entryType || '').toUpperCase();
+
+                if (type === 'WORK') {
+                    totalWork += numTotal;
+                    totalQty += numQty;
+                } else if (type === 'ADVANCE') {
+                    totalAdvance += numTotal;
+                } else if (type === 'PAID') {
+                    totalPaid += numTotal;
+                }
+
+                const tr = document.createElement('tr');
+
+                let badgeHtml = '';
+                if (type === 'WORK') badgeHtml = `<span class="badge-work">🛠️ WORK</span>`;
+                else if (type === 'ADVANCE') badgeHtml = `<span class="badge-advance">🟧 ADVANCE</span>`;
+                else if (type === 'PAID') badgeHtml = `<span class="badge-paid">🟩 PAID</span>`;
+
+                let itemDesc = row.item || row.note || '-';
+                let qtyDisplay = row.quantity ? row.quantity : '-';
+                let rateDisplay = row.rate ? `₹${row.rate} (${row.rateType === '12' ? '/ডজন' : '/পিস'})` : '-';
+
+                const canAction = currentUser && (currentUser.role === 'admin' || row.createdBy === currentUser.username);
+
+                tr.innerHTML = `
+                    <td><strong>${serialNo++}</strong></td>
+                    <td>${row.date || '-'}</td>
+                    <td>${badgeHtml}</td>
+                    <td><strong>${escapeHtml(row.worker || '-')}</strong></td>
+                    <td>${escapeHtml(itemDesc)}</td>
+                    <td>${qtyDisplay}</td>
+                    <td>${rateDisplay}</td>
+                    <td style="font-weight: bold;">₹${numTotal.toFixed(2)}</td>
+                    <td class="no-print">
+                        ${canAction ? `
+                            <button class="btn-edit" onclick="editEntry('${key}')">✏️</button>
+                            <button class="btn-delete" onclick="deleteEntry('${key}')">🗑️</button>
+                        ` : '-'}
+                    </td>
+                `;
+
+                dataTable.appendChild(tr);
+            });
+        }
+
+        // খালি অবস্থা / ফিল্টার হিন্ট
+        const emptyHint = document.getElementById('reportEmptyHint');
+        const countEl = document.getElementById('reportRecordCount');
+        if (countEl) {
+            countEl.textContent = totalInDb > 0
+                ? `(দেখাচ্ছে ${shownCount} / মোট ${totalInDb}টি)`
+                : '(কোনো রেকর্ড লোড হয়নি)';
+        }
+        if (emptyHint) {
+            if (totalInDb === 0) {
+                emptyHint.style.display = 'block';
+                emptyHint.innerHTML = '⚠️ Firebase থেকে কোনো রেকর্ড আসেনি। নিচের স্ট্যাটাস চেক করুন। Rules খোলা আছে কিনা দেখুন, অথবা নেটওয়ার্ক ঠিক আছে কিনা।';
+            } else if (shownCount === 0) {
+                emptyHint.style.display = 'block';
+                emptyHint.innerHTML = 'ℹ️ ফিল্টারে মিলছে না। <b>কর্মী = সকল</b> ও <b>মাস = সকল মাস</b> সিলেক্ট করুন, অথবা «সব দেখুন» বাটনে চাপুন। (DB-তে ' + totalInDb + 'টি রেকর্ড আছে)';
+            } else {
+                emptyHint.style.display = 'none';
+                emptyHint.innerHTML = '';
+            }
+        }
+
+        document.getElementById('summaryTotalWork').innerText = `₹${totalWork.toFixed(2)}`;
+        document.getElementById('summaryTotalAdvance').innerText = `₹${totalAdvance.toFixed(2)}`;
+        document.getElementById('summaryTotalPaid').innerText = `₹${totalPaid.toFixed(2)}`;
+
+        const balance = totalWork - (totalAdvance + totalPaid);
+        const balElem = document.getElementById('summaryBalance');
+        
+        if (balance >= 0) {
+            balElem.style.color = '#dc3545';
+            balElem.innerText = `₹${balance.toFixed(2)} (বকেয়া)`;
+        } else {
+            balElem.style.color = '#198754';
+            balElem.innerText = `₹${Math.abs(balance).toFixed(2)} (অগ্রিম দেওয়া)`;
+        }
+
+        document.getElementById('totalQuantity').innerText = totalQty;
+        document.getElementById('grandTotal').innerText = `₹${totalWork.toFixed(2)}`;
+    }
+
+    function editEntry(key) {
+        const item = inventoryData[key];
+        if (!item) return;
+        if (!currentUser || (currentUser.role !== 'admin' && item.createdBy !== currentUser.username)) { alert('❌ এই রেকর্ড সম্পাদনা করার অনুমতি নেই!'); return; }
+
+        switchFeature('data-entry');
+
+        editKeyInput.value = key;
+        document.getElementById('entryType').value = item.entryType || 'WORK';
+        toggleFormFields();
+
+        workerSelect.value = item.worker;
+        document.getElementById('date').value = item.date;
+
+        if (item.entryType === 'WORK') {
+            itemSelect.value = item.item;
+            document.getElementById('quantity').value = item.quantity;
+            document.getElementById('rate').value = item.rate;
+            
+            const rateRadios = document.getElementsByName('rateType');
+            for (let r of rateRadios) {
+                if (r.value === (item.rateType || '12')) r.checked = true;
+            }
+            updateRateNote();
+        } else {
+            document.getElementById('paymentAmount').value = item.total;
+            document.getElementById('paymentNote').value = item.note || '';
+        }
+
+        formTitle.innerText = "এন্ট্রি এডিট করুন";
+        submitBtn.innerText = "আপডেট করুন";
+    }
+
+    function deleteEntry(key) {
+        const item = inventoryData[key];
+        if (!item || !currentUser) return;
+        if (currentUser.role !== 'admin' && item.createdBy !== currentUser.username) { alert('❌ এই রেকর্ড মুছে ফেলার অনুমতি নেই!'); return; }
+        const pin = prompt("🔒 এই এন্ট্রি মুছে ফেলার জন্য আপনার সিকিউরিটি PIN লিখুন:");
+        if (pin === currentUser.pin) {
+            if (confirm("আপনি কি নিশ্চিত যে এই ডাটা মুছে ফেলতে চান?")) {
+                db.ref('inventory/' + key).remove().then(() => alert('🗑️ ডাটা সফলভাবে মুছে ফেলা হয়েছে!')).catch(err => alert('❌ ডাটা মুছতে ব্যর্থ: ' + err.message));
+            }
+        } else if (pin !== null) {
+            alert("❌ ভুল সিকিউরিটি পিন (PIN)!");
+        }
+    }
+
+    async function addUserPrompt() {
+        if (!currentUser || currentUser.role !== 'admin') {
+            alert("❌ শুধুমাত্র অ্যাডমিন নতুন অ্যাকাউন্ট তৈরি করতে পারবেন!");
+            return;
+        }
+        
+        const staffName = prompt("স্টাফের নাম লিখুন:");
+        if (!staffName || !staffName.trim()) return;
+        const trimmedName = staffName.trim();
+        const firstLetter = trimmedName.charAt(0).toUpperCase();
+
+        let workerIndex = workers.findIndex(w => {
+            const nameCheck = (typeof w === 'object' && w !== null) ? (w.name || w) : w;
+            return nameCheck && nameCheck.toLowerCase() === trimmedName.toLowerCase();
+        });
+
+        const mobileNumber = prompt(`${trimmedName}-এর ১০ ডিজিটের মোবাইল নম্বর লিখুন:`);
+        if (!mobileNumber || !/^\d{10}$/.test(mobileNumber.trim())) {
+            alert("❌ সঠিক মোবাইল নম্বর দেওয়া হয়নি!");
+            return;
+        }
+        const cleanMobile = mobileNumber.trim();
+
+        if (workerIndex === -1) {
+            workerIndex = workers.length;
+            workers.push({ name: trimmedName, phone: cleanMobile });
+        } else {
+            if (typeof workers[workerIndex] === 'string') {
+                workers[workerIndex] = { name: trimmedName, phone: cleanMobile };
+            } else {
+                workers[workerIndex].phone = cleanMobile;
+            }
+        }
+        await saveWorkersSafely();
+
+        const serialNoStr = String(workerIndex + 1).padStart(3, '0');
+        const autoGeneratedUserId = firstLetter + serialNoStr;
+        const generatedPassword = cleanMobile.slice(-4);
+
+        const pin = prompt(`ইউজার আইডি: ${autoGeneratedUserId}\nপাসওয়ার্ড: ${generatedPassword}\n\nসিকিউরিটি PIN নির্ধারণ করুন (৪-৬ ডিজিট):`, "1234");
+        if (!pin) return;
+
+        const newUser = { 
+            username: autoGeneratedUserId, 
+            password: generatedPassword, 
+            pin: pin.trim(), 
+            role: 'staff', 
+            name: trimmedName,
+            phone: cleanMobile
+        };
+
+        db.ref('users/' + autoGeneratedUserId).set(newUser);
+        alert(`✅ নতুন স্টাফ অ্যাকাউন্ট তৈরি হয়েছে!\n\nআইডি: ${autoGeneratedUserId}\nপাসওয়ার্ড: ${generatedPassword}`);
+    }
+
+
+    /* ===== Secure PIN + Biometric Entry =====
+       WebAuthn uses the phone's platform biometric (fingerprint/Face Unlock).
+       The PIN remains the fallback/second factor for data entry.
+    */
+    let biometricLoginInProgress = false;
+
+    function base64FromBuffer(buffer) {
+        return btoa(String.fromCharCode(...new Uint8Array(buffer)));
+    }
+
+    function bufferFromBase64(str) {
+        const bin = atob(str);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        return bytes;
+    }
+
+    function setBioLoginStatus(msg, ok=false) {
+        const el = document.getElementById('bioLoginStatus');
+        if (!el) return;
+        el.textContent = msg || '';
+        el.style.color = ok ? '#15803d' : '#64748b';
+    }
+
+    async function enrollCurrentUserBiometric() {
+        if (!currentUser) {
+            alert('❌ আগে লগইন করুন!');
+            return;
+        }
+        const avail = await checkBiometricAvailability();
+        if (!avail) {
+            alert('❌ এই ডিভাইসে Fingerprint/Face Biometric WebAuthn সাপোর্ট নেই।');
+            return;
+        }
+
+        try {
+            const challenge = new Uint8Array(32);
+            crypto.getRandomValues(challenge);
+            const userId = new TextEncoder().encode(currentUser.username + '|' + Date.now());
+
+            const credential = await navigator.credentials.create({
+                publicKey: {
+                    challenge,
+                    rp: { name: 'ইনভেন্টরি ও কর্মী খাতা', id: location.hostname || 'localhost' },
+                    user: {
+                        id: userId,
+                        name: currentUser.username,
+                        displayName: currentUser.name || currentUser.username
+                    },
+                    pubKeyCredParams: [
+                        { alg: -7, type: 'public-key' },
+                        { alg: -257, type: 'public-key' }
+                    ],
+                    authenticatorSelection: {
+                        authenticatorAttachment: 'platform',
+                        userVerification: 'required'
+                    },
+                    timeout: 60000,
+                    attestation: 'none'
+                }
+            });
+
+            const credId = base64FromBuffer(credential.rawId);
+            await db.ref('users/' + currentUser.username).update({
+                biometricId: credId,
+                biometricEnrolledAt: new Date().toISOString()
+            });
+            currentUser.biometricId = credId;
+            currentUser.biometricEnrolledAt = new Date().toISOString();
+            Storage.set('sunu_current_user', JSON.stringify(currentUser));
+
+            const status = document.getElementById('securityBioStatus');
+            if (status) status.textContent = '✅ Biometric চালু আছে। এই ডিভাইস থেকে Biometric দিয়ে প্রবেশ করা যাবে।';
+            alert('✅ Biometric সফলভাবে চালু হয়েছে!');
+        } catch (err) {
+            alert('❌ Biometric চালু করা যায়নি: ' + (err.message || 'অজানা সমস্যা'));
+        }
+    }
+
+    async function biometricLogin() {
+        if (biometricLoginInProgress) return;
+
+        const u = document.getElementById('usernameInput').value.trim();
+        if (!u) {
+            setBioLoginStatus('প্রথমে User ID লিখুন।');
+            document.getElementById('usernameInput').focus();
+            return;
+        }
+        const account = users[u];
+        if (!account || !account.biometricId) {
+            setBioLoginStatus('এই User ID-তে Biometric চালু করা নেই। প্রথমে Password দিয়ে লগইন করে Security Setting থেকে চালু করুন।');
+            return;
+        }
+
+        const avail = await checkBiometricAvailability();
+        if (!avail) {
+            setBioLoginStatus('এই ডিভাইসে Biometric সাপোর্ট নেই।');
+            return;
+        }
+
+        biometricLoginInProgress = true;
+        setBioLoginStatus('📲 Biometric যাচাই হচ্ছে...');
+
+        try {
+            const challenge = new Uint8Array(32);
+            crypto.getRandomValues(challenge);
+
+            const assertion = await navigator.credentials.get({
+                publicKey: {
+                    challenge,
+                    rpId: location.hostname || 'localhost',
+                    allowCredentials: [{
+                        type: 'public-key',
+                        id: bufferFromBase64(account.biometricId),
+                        transports: ['internal']
+                    }],
+                    userVerification: 'required',
+                    timeout: 60000
+                }
+            });
+
+            if (!assertion) throw new Error('Biometric যাচাই ব্যর্থ হয়েছে');
+
+            currentUser = account;
+            Storage.set('sunu_current_user', JSON.stringify(currentUser));
+            setBioLoginStatus('✅ Biometric যাচাই সফল।', true);
+            showApp();
+        } catch (err) {
+            if (err.name === 'NotAllowedError') {
+                setBioLoginStatus('❌ Biometric যাচাই বাতিল/সময় শেষ হয়েছে।');
+            } else {
+                setBioLoginStatus('❌ Biometric যাচাই ব্যর্থ হয়েছে।');
+            }
+        } finally {
+            biometricLoginInProgress = false;
+        }
+    }
+
+    async function verifyEntryBiometric() {
+        if (!currentUser || !currentUser.biometricId) return false;
+        const avail = await checkBiometricAvailability();
+        if (!avail) return false;
+
+        try {
+            const challenge = new Uint8Array(32);
+            crypto.getRandomValues(challenge);
+            const assertion = await navigator.credentials.get({
+                publicKey: {
+                    challenge,
+                    rpId: location.hostname || 'localhost',
+                    allowCredentials: [{
+                        type: 'public-key',
+                        id: bufferFromBase64(currentUser.biometricId),
+                        transports: ['internal']
+                    }],
+                    userVerification: 'required',
+                    timeout: 60000
+                }
+            });
+            return !!assertion;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    /* ===== Biometric (WebAuthn) Functions ===== */
+
+    let biometricCredentialId = null; // enrolled credential id (base64)
+
+    function isBiometricSupported() {
+        return window.PublicKeyCredential !== undefined &&
+               typeof window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable === 'function';
+    }
+
+    async function checkBiometricAvailability() {
+        if (!isBiometricSupported()) return false;
+        try {
+            return await window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+        } catch(e) { return false; }
+    }
+
+    function openBioModal() {
+        biometricCredentialId = null;
+        document.getElementById('bioWorkerName').value = '';
+        document.getElementById('bioWorkerPhone').value = '';
+        setBioState('idle');
+        document.getElementById('bioModalOverlay').classList.add('open');
+
+        checkBiometricAvailability().then(avail => {
+            const note = document.getElementById('bioSupportNote');
+            if (!avail) {
+                note.textContent = '⚠️ এই ডিভাইসে Biometric সাপোর্ট নেই — তবু নাম দিয়ে সংরক্ষণ করতে পারবেন।';
+                document.getElementById('bioFingerprintBox').style.opacity = '0.5';
+                document.getElementById('bioFingerprintBox').style.pointerEvents = 'none';
+            } else {
+                note.textContent = '';
+                document.getElementById('bioFingerprintBox').style.opacity = '1';
+                document.getElementById('bioFingerprintBox').style.pointerEvents = 'auto';
+            }
+        });
+    }
+
+    function closeBioModal() {
+        document.getElementById('bioModalOverlay').classList.remove('open');
+        biometricCredentialId = null;
+    }
+
+    function setBioState(state, msg) {
+        const box = document.getElementById('bioFingerprintBox');
+        const icon = document.getElementById('bioFpIcon');
+        const label = document.getElementById('bioFpLabel');
+        const status = document.getElementById('bioFpStatus');
+
+        box.className = 'bio-fingerprint-box';
+        if (state === 'idle') {
+            icon.textContent = '🫵';
+            label.textContent = 'Biometric যোগ করতে ক্লিক করুন';
+            status.textContent = 'আঙুলের ছাপ / Face ID ব্যবহার করুন';
+        } else if (state === 'scanning') {
+            box.classList.add('scanning');
+            icon.textContent = '📲';
+            label.textContent = 'স্ক্যান হচ্ছে...';
+            status.textContent = msg || 'আপনার আঙুল বা মুখ স্ক্যানারে রাখুন';
+        } else if (state === 'success') {
+            box.classList.add('success');
+            icon.textContent = '✅';
+            label.textContent = 'Biometric সফলভাবে নথিভুক্ত হয়েছে';
+            status.textContent = msg || 'পুনরায় ক্লিক করলে আবার নথিভুক্ত হবে';
+        } else if (state === 'error') {
+            box.classList.add('error');
+            icon.textContent = '❌';
+            label.textContent = 'Biometric নথিভুক্ত হয়নি';
+            status.textContent = msg || 'আবার চেষ্টা করুন';
+        }
+    }
+
+    async function startBiometricEnroll() {
+        const workerName = document.getElementById('bioWorkerName').value.trim();
+        if (!workerName) {
+            document.getElementById('bioWorkerName').focus();
+            document.getElementById('bioWorkerName').style.borderColor = '#ef4444';
+            setTimeout(() => document.getElementById('bioWorkerName').style.borderColor = '', 1500);
+            alert('❌ আগে কারিগরের নাম লিখুন!');
+            return;
+        }
+
+        const avail = await checkBiometricAvailability();
+        if (!avail) {
+            alert('❌ এই ডিভাইসে Biometric সাপোর্ট নেই!');
+            return;
+        }
+
+        setBioState('scanning', 'ডিভাইসের প্রম্পটে সাড়া দিন...');
+
+        try {
+            // Challenge: random 32 bytes
+            const challenge = new Uint8Array(32);
+            crypto.getRandomValues(challenge);
+
+            // User ID: derived from name + timestamp
+            const userId = new TextEncoder().encode(workerName + Date.now());
+
+            const credential = await navigator.credentials.create({
+                publicKey: {
+                    challenge: challenge,
+                    rp: { name: 'ইনভেন্টরি ও কর্মী খাতা', id: location.hostname || 'localhost' },
+                    user: {
+                        id: userId,
+                        name: workerName,
+                        displayName: workerName
+                    },
+                    pubKeyCredParams: [
+                        { alg: -7,  type: 'public-key' }, // ES256
+                        { alg: -257, type: 'public-key' } // RS256
+                    ],
+                    authenticatorSelection: {
+                        authenticatorAttachment: 'platform',
+                        userVerification: 'required'
+                    },
+                    timeout: 60000,
+                    attestation: 'none'
+                }
+            });
+
+            // Store credential ID as base64
+            biometricCredentialId = btoa(String.fromCharCode(...new Uint8Array(credential.rawId)));
+            setBioState('success', '✅ আবার ক্লিক করলে নতুন করে নথিভুক্ত হবে');
+
+        } catch (err) {
+            if (err.name === 'NotAllowedError') {
+                setBioState('error', 'অনুমতি দেওয়া হয়নি বা সময় শেষ হয়ে গেছে');
+            } else if (err.name === 'InvalidStateError') {
+                setBioState('error', 'ইতিমধ্যে নথিভুক্ত আছে, আবার চেষ্টা করুন');
+            } else {
+                setBioState('error', err.message || 'অজানা সমস্যা হয়েছে');
+            }
+            biometricCredentialId = null;
+        }
+    }
+
+    async function saveBioWorker() {
+        if (!currentUser || currentUser.role !== 'admin') { alert('❌ শুধুমাত্র অ্যাডমিন এই কাজটি করতে পারবেন!'); return; }
+
+        const cleanName = document.getElementById('bioWorkerName').value.trim();
+        if (!cleanName) {
+            alert('❌ কারিগরের নাম দেওয়া আবশ্যক!');
+            document.getElementById('bioWorkerName').focus();
+            return;
+        }
+
+        const cleanPhone = document.getElementById('bioWorkerPhone').value.trim();
+
+        const workerData = {
+            name: cleanName,
+            phone: cleanPhone,
+            biometricId: biometricCredentialId || null,
+            biometricEnrolledAt: biometricCredentialId ? new Date().toISOString() : null
+        };
+
+        workers.push(workerData);
+        await saveWorkersSafely();
+
+        const bioMsg = biometricCredentialId
+            ? '✅ কারিগর ও Biometric সফলভাবে যোগ করা হয়েছে!'
+            : '✅ কারিগর যোগ করা হয়েছে (Biometric ছাড়া)।';
+        alert(bioMsg);
+        closeBioModal();
+    }
+
+    function addWorkerPrompt() {
+        if (!currentUser || currentUser.role !== 'admin') { alert('❌ শুধুমাত্র অ্যাডমিন এই কাজটি করতে পারবেন!'); return; }
+        openBioModal();
+    }
+
+    function addItemPrompt() {
+        if (!currentUser || currentUser.role !== 'admin') { alert('❌ শুধুমাত্র অ্যাডমিন এই কাজটি করতে পারবেন!'); return; }
+        const iName = prompt("নতুন আইটেমের নাম লিখুন:");
+        if (iName && iName.trim() !== '') {
+            items.push(iName.trim());
+            db.ref('items').set(items);
+            alert("✅ আইটেম যোগ করা হয়েছে!");
+        }
+    }
+
+    function renderWorkerManagementList() {
+        const container = document.getElementById('workerListContainer');
+        if (!container) return;
+        container.innerHTML = '';
+
+        workers.forEach((w, index) => {
+            const wName = (typeof w === 'object' && w !== null) ? w.name : w;
+            let wPhone = (typeof w === 'object' && w !== null && w.phone) ? w.phone : '';
+
+            let associatedUserKey = Object.keys(users).find(uKey => {
+                return users[uKey] && users[uKey].name && users[uKey].name.toLowerCase() === (wName || '').toLowerCase();
+            });
+
+            if (!wPhone && associatedUserKey && users[associatedUserKey].phone) {
+                wPhone = users[associatedUserKey].phone;
+            }
+
+            if(wName) {
+                const serialStr = String(index + 1).padStart(3, '0');
+                const tag = document.createElement('div');
+                tag.className = 'item-tag';
+
+                const hasBio = (typeof w === 'object' && w !== null && w.biometricId);
+                const bioBadge = hasBio
+                    ? `<span class="bio-badge enrolled" title="Biometric নথিভুক্ত আছে">🫵 ✅</span>`
+                    : `<span class="bio-badge not-enrolled" title="Biometric নেই">🫵 ❌</span>`;
+
+                tag.innerHTML = `
+                    <span>
+                        <strong>${serialStr}.</strong> ${escapeHtml(wName)} 
+                        ${wPhone ? `(📞 ${escapeHtml(wPhone)})` : '<span style="color:#888;">(📞 নম্বর নেই)</span>'}
+                        ${bioBadge}
+                    </span>
+                    <button class="item-btn" title="নাম/ফোন নম্বর এডিট করুন" onclick="editWorker(${index})">✏️</button>
+                    ${currentUser && currentUser.role === 'admin' ? `<button class="item-btn" title="Biometric পুনরায় নথিভুক্ত করুন" onclick="reEnrollBiometric(${index})">🫵</button>` : ''}
+                    ${associatedUserKey ? `<button class="item-btn" title="আইডি/পাসওয়ার্ড পরিবর্তন করুন" onclick="editUserAccount('${associatedUserKey}')">🔑</button>` : ''}
+                    <button class="item-btn" title="ডিলিট করুন" onclick="removeWorker(${index})" style="color:red;">✖</button>
+                `;
+                container.appendChild(tag);
+            }
+        });
+    }
+
+    async function editWorker(index) {
+        if (!currentUser || currentUser.role !== 'admin') { alert('❌ শুধুমাত্র অ্যাডমিন এই কাজটি করতে পারবেন!'); return; }
+        const currentObj = workers[index];
+        const oldName = (typeof currentObj === 'object' && currentObj !== null) ? currentObj.name : currentObj;
+        const oldPhone = (typeof currentObj === 'object' && currentObj !== null && currentObj.phone) ? currentObj.phone : '';
+
+        const newName = prompt("কর্মীর নাম পরিবর্তন করুন:", oldName);
+        if (!newName || !newName.trim()) return;
+        const cleanName = newName.trim();
+
+        const newPhone = prompt(`${cleanName}-এর মোবাইল নম্বর দিন/পরিবর্তন করুন:`, oldPhone);
+        const cleanPhone = newPhone ? newPhone.trim() : '';
+
+        // biometricId সংরক্ষণ করুন
+        const oldBioId = (typeof currentObj === 'object' && currentObj !== null && currentObj.biometricId) ? currentObj.biometricId : null;
+        const oldBioEnrolledAt = (typeof currentObj === 'object' && currentObj !== null && currentObj.biometricEnrolledAt) ? currentObj.biometricEnrolledAt : null;
+        workers[index] = { name: cleanName, phone: cleanPhone, biometricId: oldBioId, biometricEnrolledAt: oldBioEnrolledAt };
+        await saveWorkersSafely();
+
+        Object.keys(users).forEach(uKey => {
+            if (users[uKey] && users[uKey].name && users[uKey].name.toLowerCase() === oldName.toLowerCase()) {
+                db.ref('users/' + uKey).update({
+                    name: cleanName,
+                    phone: cleanPhone
+                });
+            }
+        });
+
+        alert("✅ কর্মী নাম ও মোবাইল নম্বর সফলভাবে আপডেট করা হয়েছে!");
+    }
+
+    async function reEnrollBiometric(index) {
+        if (!currentUser || currentUser.role !== 'admin') { alert('❌ শুধুমাত্র অ্যাডমিন এই কাজটি করতে পারবেন!'); return; }
+        const workerObj = workers[index];
+        const wName = (typeof workerObj === 'object' && workerObj !== null) ? workerObj.name : workerObj;
+
+        const avail = await checkBiometricAvailability();
+        if (!avail) {
+            alert('❌ এই ডিভাইসে Biometric সাপোর্ট নেই!');
+            return;
+        }
+
+        if (!confirm(`${wName}-এর Biometric পুনরায় নথিভুক্ত করবেন?`)) return;
+
+        try {
+            const challenge = new Uint8Array(32);
+            crypto.getRandomValues(challenge);
+            const userId = new TextEncoder().encode(wName + Date.now());
+
+            const credential = await navigator.credentials.create({
+                publicKey: {
+                    challenge,
+                    rp: { name: 'ইনভেন্টরি ও কর্মী খাতা', id: location.hostname || 'localhost' },
+                    user: { id: userId, name: wName, displayName: wName },
+                    pubKeyCredParams: [
+                        { alg: -7, type: 'public-key' },
+                        { alg: -257, type: 'public-key' }
+                    ],
+                    authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required' },
+                    timeout: 60000,
+                    attestation: 'none'
+                }
+            });
+
+            const credId = btoa(String.fromCharCode(...new Uint8Array(credential.rawId)));
+            if (typeof workers[index] === 'object' && workers[index] !== null) {
+                workers[index].biometricId = credId;
+                workers[index].biometricEnrolledAt = new Date().toISOString();
+            } else {
+                workers[index] = { name: wName, phone: '', biometricId: credId, biometricEnrolledAt: new Date().toISOString() };
+            }
+            await saveWorkersSafely();
+            alert(`✅ ${wName}-এর Biometric সফলভাবে আপডেট করা হয়েছে!`);
+        } catch(err) {
+            if (err.name === 'NotAllowedError') alert('❌ অনুমতি দেওয়া হয়নি বা সময় শেষ!');
+            else alert('❌ Biometric নথিভুক্ত ব্যর্থ: ' + (err.message || err.name));
+        }
+    }
+
+    function editUserAccount(userKey) {
+        if (!currentUser || currentUser.role !== 'admin') { alert('❌ শুধুমাত্র অ্যাডমিন এই কাজটি করতে পারবেন!'); return; }
+        const userObj = users[userKey];
+        if (!userObj) return;
+
+        const newUserId = prompt(`বর্তমান ইউজার আইডি: ${userKey}\nনতুন ইউজার আইডি দিন:`, userKey);
+        if (!newUserId || !newUserId.trim()) return;
+        const cleanUserId = newUserId.trim().toLowerCase();
+        if (!/^[a-z0-9_-]{2,30}$/.test(cleanUserId)) { alert('❌ ইউজার আইডিতে শুধু ইংরেজি অক্ষর, সংখ্যা, _ বা - ব্যবহার করুন!'); return; }
+        if (cleanUserId !== userKey && users[cleanUserId]) { alert('❌ এই ইউজার আইডি আগে থেকেই আছে!'); return; }
+
+        const newPassword = prompt(`বর্তমান পাসওয়ার্ড: ${userObj.password}\nনতুন পাসওয়ার্ড লিখুন:`, userObj.password);
+        if (!newPassword || !newPassword.trim()) return;
+        const cleanPassword = newPassword.trim();
+
+        const newPin = prompt(`বর্তমান পিন: ${userObj.pin}\nনতুন সিকিউরিটি পিন লিখুন:`, userObj.pin);
+        if (!newPin || !/^\d{4,6}$/.test(newPin.trim())) { alert('❌ PIN ৪-৬ সংখ্যার হতে হবে!'); return; }
+
+        if (cleanUserId !== userKey) {
+            const updatedUserData = {
+                ...userObj,
+                username: cleanUserId,
+                password: cleanPassword,
+                pin: newPin.trim()
+            };
+            db.ref('users/' + cleanUserId).set(updatedUserData);
+            db.ref('users/' + userKey).remove();
+        } else {
+            db.ref('users/' + userKey).update({
+                password: cleanPassword,
+                pin: newPin.trim()
+            });
+        }
+
+        alert("✅ আইডি, পাসওয়ার্ড ও পিন সফলভাবে পরিবর্তন করা হয়েছে!");
+    }
+
+    function renderItemManagementList() {
+        const container = document.getElementById('itemListContainer');
+        if (!container) return;
+        container.innerHTML = '';
+        items.forEach((item, index) => {
+            if(item) {
+                const tag = document.createElement('div');
+                tag.className = 'item-tag';
+                tag.innerHTML = `
+                    <span>${escapeHtml(item)}</span>
+                    <button class="item-btn" onclick="removeItem(${index})" style="color:red;">✖</button>
+                `;
+                container.appendChild(tag);
+            }
+        });
+    }
+
+    async function removeWorker(index) {
+        if (!currentUser || currentUser.role !== 'admin') { alert('❌ শুধুমাত্র অ্যাডমিন এই কাজটি করতে পারবেন!'); return; }
+        if (confirm("আপনি কি নিশ্চিত যে এই কর্মীকে তালিকা থেকে সরাতে চান?")) {
+            workers.splice(index, 1);
+            await saveWorkersSafely();
+        }
+    }
+
+    function removeItem(index) {
+        if (!currentUser || currentUser.role !== 'admin') { alert('❌ শুধুমাত্র অ্যাডমিন এই কাজটি করতে পারবেন!'); return; }
+        if (confirm("আপনি কি নিশ্চিত যে এই আইটেমটি তালিকা থেকে সরাতে চান?")) {
+            items.splice(index, 1);
+            db.ref('items').set(items);
+        }
+    }
+
+    function toggleSettingsModal() {
+        const card = document.getElementById('settingsCard');
+        card.style.display = card.style.display === 'block' ? 'none' : 'block';
+        if (card.style.display === 'block') {
+            document.getElementById('newUsername').value = currentUser.username;
+            const bioStatus = document.getElementById('securityBioStatus');
+            if (bioStatus) {
+                bioStatus.textContent = currentUser.biometricId
+                    ? '✅ Biometric চালু আছে।'
+                    : 'এই ডিভাইসে PIN-এর পাশাপাশি Biometric দিয়ে এন্ট্রি চালু করা যাবে।';
+            }
+        }
+    }
+
+    function saveSecuritySettings(e) {
+        e.preventDefault();
+        const oldPin = document.getElementById('confirmOldPin').value.trim();
+        const newPass = document.getElementById('newPassword').value.trim();
+        const newPin = document.getElementById('newPin').value.trim();
+
+        if (oldPin !== currentUser.pin) {
+            alert("❌ বর্তমান সিকিউরিটি পিন সঠিক নয়!");
+            return;
+        }
+        if (!newPass || newPass.length < 4) { alert('❌ নতুন পাসওয়ার্ড কমপক্ষে ৪ অক্ষরের দিন!'); return; }
+        if (!/^\d{4,6}$/.test(newPin)) { alert('❌ নতুন PIN ৪-৬ সংখ্যার হতে হবে!'); return; }
+
+        db.ref('users/' + currentUser.username).update({
+            password: newPass,
+            pin: newPin
+        });
+
+        currentUser.password = newPass;
+        currentUser.pin = newPin;
+        Storage.set('sunu_current_user', JSON.stringify(currentUser));
+
+        alert("✅ সিকিউরিটি সেটিংস সফলভাবে পরিবর্তিত হয়েছে!");
+        toggleSettingsModal();
+    }
+
+    function handleForgotPassword() {
+        alert("🔑 পাসওয়ার্ড ভুলে গেলে আপনার অ্যাডমিন ইউজার অথবা সহায়কের সাথে যোগাযোগ করুন।");
+    }
+</script>
+</body>
+</html>
